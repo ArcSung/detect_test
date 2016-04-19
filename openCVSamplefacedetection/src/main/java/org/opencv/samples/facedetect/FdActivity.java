@@ -6,32 +6,34 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewFrame;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfRect;
 import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
-import org.opencv.core.Size;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.CameraBridgeViewBase.CvCameraViewListener2;
+import org.opencv.core.Size;
 import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.objdetect.CascadeClassifier;
 import org.opencv.imgproc.Imgproc;
 
 import android.app.Activity;
 import android.content.Context;
+import android.hardware.Camera;
 import android.os.Bundle;
 import android.os.Environment;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.WindowManager;
+import android.widget.Toast;
 
 public class FdActivity extends Activity implements CvCameraViewListener2 {
 
@@ -40,8 +42,6 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
     public static final int JAVA_DETECTOR = 0;
     public static final int NATIVE_DETECTOR = 1;
 
-    private MenuItem mItemFace50;
-    private MenuItem mItemFace40;
     private MenuItem mItemFace30;
     private MenuItem mItemFace20;
     private MenuItem mItemFace10;
@@ -51,16 +51,19 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
     private Mat mRgba;
     private Mat mGray;
     private File mCascadeFile;
+    private File mCascadeFile2;
     private CascadeClassifier mJavaDetector;
     private DetectionBasedTracker mNativeDetector;
+    private DetectionBasedTracker mNativeDetector2;
 
-    private int mDetectorType = JAVA_DETECTOR;
+    private int mDetectorType = NATIVE_DETECTOR;
     private String[] mDetectorName;
 
     private float mRelativeFaceSize = 0.05f;
     private int mAbsoluteFaceSize = 0;
 
-    private CameraBridgeViewBase mOpenCvCameraView;
+    private CameraView mOpenCvCameraView;
+    private List<Camera.Size> mResolutionList;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -75,9 +78,12 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
                     try {
                         // load cascade file from application resources
                         InputStream is = getResources().openRawResource(R.raw.outputwg);
+                        InputStream is2 = getResources().openRawResource(R.raw.output_char);
                         File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
-                        mCascadeFile = new File(cascadeDir, "lbpcascade_frontalface.xml");
+                        mCascadeFile = new File(cascadeDir, "outputwg.xml");
+                        mCascadeFile2 = new File(cascadeDir, "output_char.xml");
                         FileOutputStream os = new FileOutputStream(mCascadeFile);
+                        FileOutputStream os2 = new FileOutputStream(mCascadeFile2);
 
                         byte[] buffer = new byte[4096];
                         int bytesRead;
@@ -87,6 +93,12 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
                         is.close();
                         os.close();
 
+                        while ((bytesRead = is2.read(buffer)) != -1) {
+                            os2.write(buffer, 0, bytesRead);
+                        }
+                        is2.close();
+                        os2.close();
+
                         mJavaDetector = new CascadeClassifier(mCascadeFile.getAbsolutePath());
                         if (mJavaDetector.empty()) {
                             Log.e(TAG, "Failed to load cascade classifier");
@@ -95,6 +107,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
                             Log.i(TAG, "Loaded cascade classifier from " + mCascadeFile.getAbsolutePath());
 
                         mNativeDetector = new DetectionBasedTracker(mCascadeFile.getAbsolutePath(), 0);
+                        mNativeDetector2 = new DetectionBasedTracker(mCascadeFile2.getAbsolutePath(), 0);
 
                         cascadeDir.delete();
 
@@ -104,6 +117,8 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
                     }
 
                     mOpenCvCameraView.enableView();
+                    mNativeDetector.start();
+                    mNativeDetector2.start();
                 }
                 break;
                 default: {
@@ -133,7 +148,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
         setContentView(R.layout.face_detect_surface_view);
 
-        mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.fd_activity_surface_view);
+        mOpenCvCameraView = (CameraView) findViewById(R.id.fd_activity_surface_view);
         mOpenCvCameraView.setCvCameraViewListener(this);
     }
 
@@ -164,6 +179,25 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
     public void onCameraViewStarted(int width, int height) {
         mGray = new Mat();
         mRgba = new Mat();
+
+        Camera.Size resolution = null;
+        int id = 0;
+        mResolutionList = mOpenCvCameraView.getResolutionList();
+        for(; id <= mResolutionList.size(); id++)
+        {
+            resolution = mResolutionList.get(id);
+            if(resolution.width == 1280 && resolution.height == 720)
+                break;
+        }
+
+        if(id > mResolutionList.size())
+            resolution = mResolutionList.get(0);
+
+        mOpenCvCameraView.setResolution(resolution);
+        resolution = mOpenCvCameraView.getResolution();
+        String caption = Integer.valueOf(resolution.width).toString() + "x" + Integer.valueOf(resolution.height).toString();
+        Toast.makeText(this, caption, Toast.LENGTH_SHORT).show();
+        Log.i(TAG, "resolution" + Integer.valueOf(resolution.width).toString() + "x" + Integer.valueOf(resolution.height).toString());
     }
 
     public void onCameraViewStopped() {
@@ -183,6 +217,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
                 mAbsoluteFaceSize = Math.round(height * mRelativeFaceSize);
             }
             mNativeDetector.setMinFaceSize(mAbsoluteFaceSize);
+            mNativeDetector2.setMinFaceSize((int)(mAbsoluteFaceSize/4));
         }
 
         MatOfRect faces = new MatOfRect();
@@ -191,14 +226,14 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
             if (mJavaDetector != null)
                 mJavaDetector.detectMultiScale(mGray, faces, 1.1, 2, 2, // TODO: objdetect.CV_HAAR_SCALE_IMAGE
                         new Size(mAbsoluteFaceSize, mAbsoluteFaceSize), new Size());
-        }*/
-        //else if (mDetectorType == NATIVE_DETECTOR) {
-        if (mNativeDetector != null)
-            MaxRect = AdaBoost(mGray, faces);
-        /*}
+        }
+        else*/ if (mDetectorType == NATIVE_DETECTOR) {
+            if (mNativeDetector != null)
+                MaxRect = AdaBoost(mGray, faces);
+        }
         else {
             Log.e(TAG, "Detection method is not selected!");
-        }*/
+        }
 
         /*Rect[] facesArray = faces.toArray();
         for (int i = 0; i < facesArray.length; i++) {
@@ -212,12 +247,12 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
         }*/
 
-        MaxRect.tl().x = MaxRect.tl().x - (MaxRect.width * 0.14);
+        MaxRect.tl().x = MaxRect.tl().x - (MaxRect.width * 0.1);
         if (MaxRect.tl().x <= 0) {
             MaxRect.tl().x = 1;
         }
 
-        MaxRect.br().x = MaxRect.br().x + (MaxRect.width * 0.14);
+        MaxRect.br().x = MaxRect.br().x + (MaxRect.width * 0.1);
         if (MaxRect.br().x >= mRgba.width()) {
             MaxRect.br().x = mRgba.width() - 1;
         }
@@ -281,9 +316,11 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
             if (type == NATIVE_DETECTOR) {
                 Log.i(TAG, "Detection Based Tracker enabled");
                 mNativeDetector.start();
+                mNativeDetector2.start();
             } else {
                 Log.i(TAG, "Cascade detector enabled");
                 mNativeDetector.stop();
+                mNativeDetector2.stop();
             }
         }
     }
@@ -310,14 +347,12 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
     }
 
     public Rect AdaBoost(Mat imageGray, MatOfRect faces) {
-
-        //int[] LPD_fin = new int[4];
-        //LPD_fin[0] = 0;
-        //LPD_fin[1] = 0;
-        //LPD_fin[2] = 0;
-        //LPD_fin[3] = 0;
+        Rect PlateRect;
+        PlateRect = new Rect();
+        Mat PlateImg = new Mat();
         Rect MaxRect;
         MaxRect = new Rect();
+        MatOfRect chars = new MatOfRect();
 
         //int[] LPD = opencv.LPD(cascadeFile, pix, Width, Height, 3);
         if (mNativeDetector != null)
@@ -325,10 +360,9 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
         Rect[] facesArray = faces.toArray();
 
-        int case1 = facesArray.length;
-
-        if (case1 != 0) {
+        if (facesArray.length != 0) {
             //找出所有車牌定位出來的影像區塊並將此區塊合併成一個區塊
+            Log.i("ArcSung", "have plate");
             int mini_x_left = 2000;
             int max_x_right = 0;
             int mini_y_up = 2000;
@@ -358,12 +392,116 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
             mini_y_up = mini_y_up - 45;  //35
             max_y_down = max_y_down + 45;  //35
 
-            int mini_pix_w = max_x_right - mini_x_left;
-            int mini_pix_h = max_y_down - mini_y_up;
             //int[] mini_pix = new int[mini_pix_w * mini_pix_h];
 
+            if(mini_x_left < 10)
+                mini_x_left = 10;
+            if(max_x_right > mGray.width() - 10)
+                max_x_right = mGray.width() - 10;
+            if(mini_y_up < 10)
+                mini_x_left = 10;
+            if(max_y_down > mGray.height() - 10)
+                max_y_down = mGray.height() - 10;
 
+            int mini_pix_w = max_x_right - mini_x_left;
+            int mini_pix_h = max_y_down - mini_y_up;
+
+            PlateRect =new Rect(mini_x_left, mini_y_up, mini_pix_w, mini_pix_h);
             MaxRect =new Rect(mini_x_left, mini_y_up, mini_pix_w, mini_pix_h);
+
+            PlateImg = new Mat(mGray, PlateRect);
+
+            if (mNativeDetector2 != null)
+                mNativeDetector2.detect(mGray, chars);
+
+            Rect[] charsArray = chars.toArray();
+
+
+            if (charsArray.length != 0) {
+                Log.i("ArcSung", "have char");
+                int[] LPD_fin = new int[4];
+                for(int i = 0; i < charsArray.length; i++)
+                {
+                    charsArray[i].tl().x = charsArray[i].tl().x + mini_x_left;
+                    charsArray[i].br().x = charsArray[i].br().x + mini_x_left;
+                    charsArray[i].tl().y = charsArray[i].tl().y + mini_y_up;
+                    charsArray[i].br().y = charsArray[i].br().y + mini_y_up;
+                }
+
+                for(int i = 0; i < facesArray.length; i++)
+                {
+                    facesArray[i].tl().x = facesArray[i].tl().x - 20;
+                    facesArray[i].br().x = facesArray[i].br().x + 20;
+                }
+
+                int count1 = 0;
+                int count2 = -4;
+                int index = 0;
+
+                for (int i = 0; i < facesArray.length; i+=4)
+                {
+                    for (int j = 0; j < charsArray.length; j+=4)
+                    {
+                        if (facesArray[i].tl().y - 30 < charsArray[j].tl().y && facesArray[i].br().y + 30 > charsArray[j].br().y)
+                        {
+                            count1 = count1 + 1;
+                        }
+                    }
+                    if(count1 != 0 && count1 > index)    //count1 >= index
+                    {
+                        count2 = count2 + 4;
+
+                        LPD_fin[0] = (int)facesArray[i].tl().x;
+                        LPD_fin[1] = (int)facesArray[i].br().x;
+                        LPD_fin[2] = (int)facesArray[i].tl().y;
+                        LPD_fin[3] = (int)facesArray[i].br().y;
+
+                        index = count1;
+                    }
+                    //index = count1;
+                    count1 = 0;
+                }
+
+                int OT = 30;
+
+                if (LPD_fin[1] - LPD_fin[0] > 235 && LPD_fin[1] - LPD_fin[0] < 300)
+                {
+                    OT = 40;
+                }
+
+                /*for (int i = 0; i < LPD_fin.length; i+=4)
+                {
+                    for (int j = 0; j < charsArray.length; j+=4)
+                    {
+                        if(LPD_fin[i + 2] + OT > charsArray[j].tl().y && LPD_fin[i + 2] - OT < charsArray[j].tl().y)
+                        {
+
+                            if(charsArray[j].tl().x < LPD_fin[i + 0])
+                            {
+                                if(LPD_fin[i + 0] - charsArray[j].tl().x < OT)
+                                {
+                                    LPD_fin[i + 0] = (int)charsArray[j].tl().x;
+                                }
+                            }
+
+                            if(charsArray[j].br().x > LPD_fin[i + 1])
+                            {
+                                if(charsArray[j].br().x - LPD_fin[i + 1] < OT)
+                                {
+                                    LPD_fin[i + 1] = (int)charsArray[j].br().x;
+                                }
+                            }
+
+                        }
+
+                    }
+                }*/
+
+                MaxRect = new Rect(new Point(LPD_fin[0], LPD_fin[2]), new Point(LPD_fin[1], LPD_fin[3]));
+                return MaxRect;
+
+            }
+
 
         }
 
