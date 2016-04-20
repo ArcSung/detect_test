@@ -32,13 +32,16 @@ import android.os.Environment;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.view.WindowManager;
+import android.widget.ImageButton;
 import android.widget.Toast;
 
 public class FdActivity extends Activity implements CvCameraViewListener2 {
 
     private static final String TAG = "OCVSample::Activity";
     private static final Scalar FACE_RECT_COLOR = new Scalar(0, 255, 0, 255);
+    private static final Scalar CHAR_RECT_COLOR = new Scalar(255, 0, 0, 255);
     public static final int JAVA_DETECTOR = 0;
     public static final int NATIVE_DETECTOR = 1;
 
@@ -48,6 +51,8 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
     private MenuItem mItemFace05;
     private MenuItem mItemType;
 
+    private ImageButton ImageButton_TakePicture;
+
     private Mat mRgba;
     private Mat mGray;
     private File mCascadeFile;
@@ -55,6 +60,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
     private CascadeClassifier mJavaDetector;
     private DetectionBasedTracker mNativeDetector;
     private DetectionBasedTracker mNativeDetector2;
+    private Rect CaptureRect;
 
     private int mDetectorType = NATIVE_DETECTOR;
     private String[] mDetectorName;
@@ -150,6 +156,10 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
         mOpenCvCameraView = (CameraView) findViewById(R.id.fd_activity_surface_view);
         mOpenCvCameraView.setCvCameraViewListener(this);
+
+        ImageButton_TakePicture = (ImageButton)findViewById(R.id.camera_takepicture);
+
+        ImageButton_TakePicture.setOnClickListener(ImageButtonlistener);
     }
 
     @Override
@@ -229,7 +239,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
         }
         else*/ if (mDetectorType == NATIVE_DETECTOR) {
             if (mNativeDetector != null)
-                MaxRect = AdaBoost(mGray, faces);
+                MaxRect = AdaBoost(mGray, mRgba, faces);
         }
         else {
             Log.e(TAG, "Detection method is not selected!");
@@ -269,6 +279,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
         //Mat img_crop2 = new Mat(inputFrame.rgba(), MaxRect);
         //SaveImage(img_crop2);
+        CaptureRect = MaxRect;
         Imgproc.rectangle(mRgba, MaxRect.tl(), MaxRect.br(), FACE_RECT_COLOR, 3);
 
         return mRgba;
@@ -340,19 +351,19 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
         filename = file.toString();
         bool = Imgcodecs.imwrite(filename, mIntermediateMat);
 
-        /*if (bool == true)
+        if (bool == true)
             Toast.makeText(this, "Save Success", Toast.LENGTH_SHORT).show();
         else
-            Toast.makeText(this, "Save fail", Toast.LENGTH_SHORT).show();*/
+            Toast.makeText(this, "Save fail", Toast.LENGTH_SHORT).show();
     }
 
-    public Rect AdaBoost(Mat imageGray, MatOfRect faces) {
+    public Rect AdaBoost(Mat imageGray, Mat imageRGB, MatOfRect faces) {
         Rect PlateRect;
-        PlateRect = new Rect();
         Mat PlateImg = new Mat();
         Rect MaxRect;
         MaxRect = new Rect();
         MatOfRect chars = new MatOfRect();
+        Imgproc.equalizeHist(imageGray, imageGray);
 
         //int[] LPD = opencv.LPD(cascadeFile, pix, Width, Height, 3);
         if (mNativeDetector != null)
@@ -420,12 +431,13 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
             if (charsArray.length != 0) {
                 Log.i("ArcSung", "have char");
                 int[] LPD_fin = new int[4];
-                for(int i = 0; i < charsArray.length; i++)
+                for(int i = 0; i < charsArray.length; i++)// change location to origin img
                 {
                     charsArray[i].tl().x = charsArray[i].tl().x + mini_x_left;
                     charsArray[i].br().x = charsArray[i].br().x + mini_x_left;
                     charsArray[i].tl().y = charsArray[i].tl().y + mini_y_up;
                     charsArray[i].br().y = charsArray[i].br().y + mini_y_up;
+                    //Imgproc.rectangle(imageRGB, charsArray[i].tl(), charsArray[i].br(), CHAR_RECT_COLOR, 3);
                 }
 
                 for(int i = 0; i < facesArray.length; i++)
@@ -469,33 +481,31 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
                     OT = 40;
                 }
 
-                /*for (int i = 0; i < LPD_fin.length; i+=4)
+                for (int j = 0; j < charsArray.length; j+=4)
                 {
-                    for (int j = 0; j < charsArray.length; j+=4)
+                    if(LPD_fin[2] + OT > charsArray[j].tl().y && LPD_fin[2] - OT < charsArray[j].tl().y)
                     {
-                        if(LPD_fin[i + 2] + OT > charsArray[j].tl().y && LPD_fin[i + 2] - OT < charsArray[j].tl().y)
+
+                        if(charsArray[j].tl().x < LPD_fin[0])
                         {
-
-                            if(charsArray[j].tl().x < LPD_fin[i + 0])
+                            if(LPD_fin[0] - charsArray[j].tl().x < OT)
                             {
-                                if(LPD_fin[i + 0] - charsArray[j].tl().x < OT)
-                                {
-                                    LPD_fin[i + 0] = (int)charsArray[j].tl().x;
-                                }
+                                LPD_fin[0] = (int)charsArray[j].tl().x;
                             }
+                        }
 
-                            if(charsArray[j].br().x > LPD_fin[i + 1])
+                        if(charsArray[j].br().x > LPD_fin[1])
+                        {
+                            if(charsArray[j].br().x - LPD_fin[1] < OT)
                             {
-                                if(charsArray[j].br().x - LPD_fin[i + 1] < OT)
-                                {
-                                    LPD_fin[i + 1] = (int)charsArray[j].br().x;
-                                }
+                                LPD_fin[1] = (int)charsArray[j].br().x;
                             }
-
                         }
 
                     }
-                }*/
+
+                }
+
 
                 MaxRect = new Rect(new Point(LPD_fin[0], LPD_fin[2]), new Point(LPD_fin[1], LPD_fin[3]));
                 return MaxRect;
@@ -507,4 +517,24 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
         return MaxRect;
     }
+
+    private View.OnClickListener ImageButtonlistener =new View.OnClickListener(){
+
+        @Override
+        public void onClick(View v) {
+            // TODO Auto-generated method stub
+            switch(v.getId()){
+                case R.id.camera_takepicture:
+                    Mat PlateImg = new Mat(mRgba, CaptureRect);
+                    SaveImage(PlateImg);
+                    //ImageButton_Cancel.setVisibility(View.VISIBLE);
+                    //ImageButton_Check.setVisibility(View.VISIBLE);
+                    //ImageButton_Gralloc.setVisibility(View.GONE);
+                    //ImageButton_TakePicture.setVisibility(View.GONE);
+                    //Camera_button_check = true;
+                    break;
+
+            }
+        }
+    };
 }

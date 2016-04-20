@@ -1,4 +1,4 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent" >
@@ -8,4 +8,20 @@
         android:layout_height="fill_parent"
         android:id="@+id/fd_activity_surface_view" />
 
-</LinearLayout>
+    <RelativeLayout
+        android:id="@+id/RelateLayout02"
+        android:layout_height="fill_parent"
+        android:layout_width="65dp"
+        android:background="#88606060"
+        android:layout_alignParentRight="true">
+        <ImageButton
+            android:id="@+id/camera_takepicture"
+            android:layout_width="65dp"
+            android:layout_height="65dp"
+            android:background="#00606060"
+            android:layout_centerVertical="true"
+            android:src="@drawable/camera_takepicture" />
+
+    </RelativeLayout>
+
+</RelativeLayout>
