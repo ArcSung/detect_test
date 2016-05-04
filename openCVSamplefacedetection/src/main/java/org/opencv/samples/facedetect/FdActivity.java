@@ -423,7 +423,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
             PlateImg = new Mat(mGray, PlateRect);
 
             if (mNativeDetector2 != null)
-                mNativeDetector2.detect(mGray, chars);
+                mNativeDetector2.detect(PlateImg, chars);
 
             Rect[] charsArray = chars.toArray();
 
