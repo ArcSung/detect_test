@@ -79,7 +79,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
                     Log.i(TAG, "OpenCV loaded successfully");
 
                     // Load native library after(!) OpenCV initialization
-                    System.loadLibrary("detection_based_tracker");
+                    System.loadLibrary("OpenCV_Plate_Recognition");
 
                     try {
                         // load cascade file from application resources
@@ -105,15 +105,9 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
                         is2.close();
                         os2.close();
 
-                        mJavaDetector = new CascadeClassifier(mCascadeFile.getAbsolutePath());
-                        if (mJavaDetector.empty()) {
-                            Log.e(TAG, "Failed to load cascade classifier");
-                            mJavaDetector = null;
-                        } else
-                            Log.i(TAG, "Loaded cascade classifier from " + mCascadeFile.getAbsolutePath());
-
-                        mNativeDetector = new DetectionBasedTracker(mCascadeFile.getAbsolutePath(), 0);
-                        mNativeDetector2 = new DetectionBasedTracker(mCascadeFile2.getAbsolutePath(), 0);
+                        //mNativeDetector = new DetectionBasedTracker(mCascadeFile.getAbsolutePath(), 0);
+                        //mNativeDetector2 = new DetectionBasedTracker(mCascadeFile2.getAbsolutePath(), 0);
+                        OpenCVInit();
 
                         cascadeDir.delete();
 
@@ -123,8 +117,8 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
                     }
 
                     mOpenCvCameraView.enableView();
-                    mNativeDetector.start();
-                    mNativeDetector2.start();
+                    //mNativeDetector.start();
+                    //mNativeDetector2.start();
                 }
                 break;
                 default: {
@@ -219,68 +213,8 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
         mRgba = inputFrame.rgba();
         mGray = inputFrame.gray();
-        Rect MaxRect = new Rect();
 
-        if (mAbsoluteFaceSize == 0) {
-            int height = mGray.rows();
-            if (Math.round(height * mRelativeFaceSize) > 0) {
-                mAbsoluteFaceSize = Math.round(height * mRelativeFaceSize);
-            }
-            mNativeDetector.setMinFaceSize(mAbsoluteFaceSize);
-            mNativeDetector2.setMinFaceSize((int)(mAbsoluteFaceSize/4));
-        }
-
-        MatOfRect faces = new MatOfRect();
-
-        /*if (mDetectorType == JAVA_DETECTOR) {
-            if (mJavaDetector != null)
-                mJavaDetector.detectMultiScale(mGray, faces, 1.1, 2, 2, // TODO: objdetect.CV_HAAR_SCALE_IMAGE
-                        new Size(mAbsoluteFaceSize, mAbsoluteFaceSize), new Size());
-        }
-        else*/ if (mDetectorType == NATIVE_DETECTOR) {
-            if (mNativeDetector != null)
-                MaxRect = AdaBoost(mGray, mRgba, faces);
-        }
-        else {
-            Log.e(TAG, "Detection method is not selected!");
-        }
-
-        /*Rect[] facesArray = faces.toArray();
-        for (int i = 0; i < facesArray.length; i++) {
-            if(i == 0)
-                MaxRect = facesArray[i];
-            else
-            {
-                if(facesArray[i].width > MaxRect.width)
-                    MaxRect = facesArray[i];
-            }
-
-        }*/
-
-        MaxRect.tl().x = MaxRect.tl().x - (MaxRect.width * 0.1);
-        if (MaxRect.tl().x <= 0) {
-            MaxRect.tl().x = 1;
-        }
-
-        MaxRect.br().x = MaxRect.br().x + (MaxRect.width * 0.1);
-        if (MaxRect.br().x >= mRgba.width()) {
-            MaxRect.br().x = mRgba.width() - 1;
-        }
-
-        MaxRect.tl().y = MaxRect.tl().y - (MaxRect.height * 0.05);//+ 15;
-        if (MaxRect.tl().y <= 0) {
-            MaxRect.tl().y = 1;
-        }
-
-        MaxRect.br().y = MaxRect.br().y + (MaxRect.height * 0.05);
-        if (MaxRect.br().y >= mRgba.height()) {
-            MaxRect.br().y = mRgba.height() - 1;
-        }
-
-        //Mat img_crop2 = new Mat(inputFrame.rgba(), MaxRect);
-        //SaveImage(img_crop2);
-        CaptureRect = MaxRect;
-        Imgproc.rectangle(mRgba, MaxRect.tl(), MaxRect.br(), FACE_RECT_COLOR, 3);
+        OpenCVLPD(mGray.getNativeObjAddr() , mRgba.getNativeObjAddr());
 
         return mRgba;
     }
@@ -537,4 +471,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
             }
         }
     };
+
+    public native void  OpenCVLPD(long matAddrGr, long matAddrRgba);
+    public native void  OpenCVInit();
 }
