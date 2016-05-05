@@ -37,7 +37,7 @@ import android.view.WindowManager;
 import android.widget.ImageButton;
 import android.widget.Toast;
 
-public class FdActivity extends Activity implements CvCameraViewListener2 {
+public class LPDActivity extends Activity implements CvCameraViewListener2 {
 
     private static final String TAG = "OCVSample::Activity";
     private static final Scalar FACE_RECT_COLOR = new Scalar(0, 255, 0, 255);
@@ -127,7 +127,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
         }
     };
 
-    public FdActivity() {
+    public LPDActivity() {
         mDetectorName = new String[2];
         mDetectorName[JAVA_DETECTOR] = "Java";
         mDetectorName[NATIVE_DETECTOR] = "Native (tracking)";
