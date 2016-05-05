@@ -55,11 +55,9 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
     private Mat mRgba;
     private Mat mGray;
-    private File mCascadeFile;
-    private File mCascadeFile2;
+    private File mClassFile;
+    private File mImageFile;
     private CascadeClassifier mJavaDetector;
-    private DetectionBasedTracker mNativeDetector;
-    private DetectionBasedTracker mNativeDetector2;
     private Rect CaptureRect;
 
     private int mDetectorType = NATIVE_DETECTOR;
@@ -83,13 +81,13 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
                     try {
                         // load cascade file from application resources
-                        InputStream is = getResources().openRawResource(R.raw.outputwg);
-                        InputStream is2 = getResources().openRawResource(R.raw.output_char);
+                        InputStream is = getResources().openRawResource(R.raw.classifications);
+                        InputStream is2 = getResources().openRawResource(R.raw.images);
                         File cascadeDir = getDir("cascade", Context.MODE_PRIVATE);
-                        mCascadeFile = new File(cascadeDir, "outputwg.xml");
-                        mCascadeFile2 = new File(cascadeDir, "output_char.xml");
-                        FileOutputStream os = new FileOutputStream(mCascadeFile);
-                        FileOutputStream os2 = new FileOutputStream(mCascadeFile2);
+                        mClassFile = new File(cascadeDir, "classifications.xml");
+                        mImageFile = new File(cascadeDir, "images.xml");
+                        FileOutputStream os = new FileOutputStream(mClassFile);
+                        FileOutputStream os2 = new FileOutputStream(mImageFile);
 
                         byte[] buffer = new byte[4096];
                         int bytesRead;
@@ -107,7 +105,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
                         //mNativeDetector = new DetectionBasedTracker(mCascadeFile.getAbsolutePath(), 0);
                         //mNativeDetector2 = new DetectionBasedTracker(mCascadeFile2.getAbsolutePath(), 0);
-                        OpenCVInit();
+                        OpenCVInit(mClassFile.getAbsolutePath(), mImageFile.getAbsolutePath());
 
                         cascadeDir.delete();
 
@@ -255,19 +253,7 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
     }
 
     private void setDetectorType(int type) {
-        if (mDetectorType != type) {
-            mDetectorType = type;
 
-            if (type == NATIVE_DETECTOR) {
-                Log.i(TAG, "Detection Based Tracker enabled");
-                mNativeDetector.start();
-                mNativeDetector2.start();
-            } else {
-                Log.i(TAG, "Cascade detector enabled");
-                mNativeDetector.stop();
-                mNativeDetector2.stop();
-            }
-        }
     }
 
     private void SaveImage(Mat mat) {
@@ -300,8 +286,8 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
         Imgproc.equalizeHist(imageGray, imageGray);
 
         //int[] LPD = opencv.LPD(cascadeFile, pix, Width, Height, 3);
-        if (mNativeDetector != null)
-            mNativeDetector.detect(mGray, faces);
+        //if (mNativeDetector != null)
+        //    mNativeDetector.detect(mGray, faces);
 
         Rect[] facesArray = faces.toArray();
 
@@ -356,8 +342,8 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
 
             PlateImg = new Mat(mGray, PlateRect);
 
-            if (mNativeDetector2 != null)
-                mNativeDetector2.detect(PlateImg, chars);
+            //if (mNativeDetector2 != null)
+            //    mNativeDetector2.detect(PlateImg, chars);
 
             Rect[] charsArray = chars.toArray();
 
@@ -473,5 +459,5 @@ public class FdActivity extends Activity implements CvCameraViewListener2 {
     };
 
     public native void  OpenCVLPD(long matAddrGr, long matAddrRgba);
-    public native void  OpenCVInit();
+    public native void  OpenCVInit(String classfile, String imagefile);
 }
